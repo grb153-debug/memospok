@@ -124,6 +124,32 @@
     /* 메모 추가(＋) 탭 */
     .tab.addtab { min-height: 64px; background: rgba(255,255,255,0.55); border: 2px dashed rgba(0,0,0,0.28); box-shadow: -3px 3px 8px rgba(0,0,0,0.15); }
     .tab.addtab .label { color: #374151; font-size: 30px; }
+
+    /* ── 자동 업데이트 알림 (오른쪽 아래 작게) ── */
+    .update-toast {
+      position: fixed; right: 12px; bottom: 12px;
+      max-width: 300px; display: none;
+      background: rgba(17,24,39,0.92); color: #fff;
+      border-radius: 12px; padding: 12px 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+      font-size: 15px; font-weight: 700; line-height: 1.45;
+      z-index: 9999;
+    }
+    .update-toast.show { display: block; }
+    .update-toast .ut-msg { display: flex; align-items: center; gap: 8px; }
+    .update-toast .ut-bar {
+      margin-top: 8px; height: 7px; border-radius: 999px;
+      background: rgba(255,255,255,0.22); overflow: hidden; display: none;
+    }
+    .update-toast .ut-bar.show { display: block; }
+    .update-toast .ut-fill { height: 100%; width: 0%; background: #34D399; transition: width .2s ease; }
+    .update-toast .ut-btn {
+      margin-top: 10px; display: none;
+      width: 100%; border: none; border-radius: 10px;
+      padding: 9px 12px; font-size: 15px; font-weight: 800; cursor: pointer;
+      background: #34D399; color: #064E3B;
+    }
+    .update-toast .ut-btn.show { display: block; }
   </style>
 </head>
 <body>
@@ -158,6 +184,13 @@
 
     <!-- 세로 탭 묶음 -->
     <div class="strip" id="strip"></div>
+  </div>
+
+  <!-- 자동 업데이트 알림 -->
+  <div class="update-toast" id="updateToast">
+    <div class="ut-msg"><span id="utText">업데이트 확인 중…</span></div>
+    <div class="ut-bar" id="utBar"><div class="ut-fill" id="utFill"></div></div>
+    <button class="ut-btn" id="utBtn">지금 재시작해서 적용</button>
   </div>
 
   <script>
@@ -290,6 +323,48 @@
         try { autoRunChk.checked = !!(window.widget && await window.widget.getAutoLaunch()); } catch {}
       }
     });
+
+    // ── 자동 업데이트 알림 표시 ──
+    const toast = document.getElementById('updateToast');
+    const utText = document.getElementById('utText');
+    const utBar = document.getElementById('utBar');
+    const utFill = document.getElementById('utFill');
+    const utBtn = document.getElementById('utBtn');
+    let toastTimer = null;
+
+    function showToast(text, { bar = false, btn = false, autoHide = 0 } = {}) {
+      utText.textContent = text;
+      toast.classList.add('show');
+      utBar.classList.toggle('show', bar);
+      utBtn.classList.toggle('show', btn);
+      clearTimeout(toastTimer);
+      if (autoHide > 0) toastTimer = setTimeout(() => toast.classList.remove('show'), autoHide);
+    }
+
+    utBtn.addEventListener('click', () => { if (window.widget) window.widget.installUpdate(); });
+
+    if (window.widget && window.widget.onUpdateStatus) {
+      window.widget.onUpdateStatus((d) => {
+        switch (d && d.state) {
+          case 'available':
+            showToast(`새 버전(${d.version})이 있습니다. 받는 중…`, { bar: true });
+            utFill.style.width = '0%';
+            break;
+          case 'downloading':
+            showToast(`업데이트 받는 중… ${d.percent}%`, { bar: true });
+            utFill.style.width = (d.percent || 0) + '%';
+            break;
+          case 'downloaded':
+            showToast(`업데이트 준비 완료! 다음에 켤 때 자동 적용됩니다.`, { btn: true });
+            break;
+          case 'error':
+            // 조용히 숨김 (네트워크 문제 등으로 앱 사용엔 지장 없음)
+            toast.classList.remove('show');
+            break;
+          // 'checking' / 'none' 은 화면을 어지럽히지 않도록 표시하지 않음
+        }
+      });
+    }
 
     // 시작: 저장된 메모 불러오기
     (async () => {

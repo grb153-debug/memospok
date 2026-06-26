@@ -1,6 +1,6 @@
 {
   "name": "memospok",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "메모쏙 - 데스크톱 메모 위젯 (화면 오른쪽 가장자리 포스트잇)",
   "main": "main.js",
   "author": "memospok",
@@ -27,6 +27,13 @@
     "win": {
       "target": "nsis"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "grb153-debug",
+        "repo": "memospok"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -35,5 +42,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "메모쏙"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

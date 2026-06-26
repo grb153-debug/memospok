@@ -7,4 +7,8 @@ contextBridge.exposeInMainWorld('widget', {
   saveMemos:   (list) => ipcRenderer.invoke('memos:save', list),
   getAutoLaunch: () => ipcRenderer.invoke('autolaunch:get'),
   setAutoLaunch: (enable) => ipcRenderer.invoke('autolaunch:set', !!enable),
+
+  // 자동 업데이트: 메인 프로세스가 보내는 상태를 화면이 받아 표시
+  onUpdateStatus: (cb) => ipcRenderer.on('update:status', (_e, data) => cb(data)),
+  installUpdate: () => ipcRenderer.send('update:install'),
 });
