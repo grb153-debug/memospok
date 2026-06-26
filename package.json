@@ -1,0 +1,39 @@
+{
+  "name": "memospok",
+  "version": "1.0.1",
+  "description": "메모쏙 - 데스크톱 메모 위젯 (화면 오른쪽 가장자리 포스트잇)",
+  "main": "main.js",
+  "author": "memospok",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.memospok.app",
+    "productName": "메모쏙",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "메모쏙"
+    }
+  }
+}

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'" />
+  <title>메모쏙</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; background: transparent; }
+    body {
+      font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;
+      user-select: none; overflow: hidden;
+    }
+
+    /* 화면 오른쪽 끝에 붙는 영역: [메모판] [세로 탭] */
+    .app {
+      position: fixed; top: 44px; right: 0;
+      display: flex; align-items: flex-start;
+    }
+
+    /* ── 펼쳐지는 메모판 ── */
+    .panel {
+      width: 320px; margin-right: 9px;
+      height: calc(100vh - 56px);          /* 화면 세로를 거의 가득 채움 */
+      display: none; flex-direction: column;
+      background: var(--bg, #FFE7A0);
+      border-radius: 18px 0 0 18px;
+      box-shadow: -10px 10px 26px rgba(0,0,0,0.25);
+    }
+    body.expanded .panel { display: flex; }
+
+    .panel .p-head { padding: 16px 16px 0; }
+    .t-input {
+      width: 100%;
+      background: rgba(255,255,255,0.6);
+      border: 2px solid rgba(0,0,0,0.14);
+      border-radius: 12px; padding: 12px 14px;
+      font-size: 23px; font-weight: 800; color: var(--fg, #111827);
+      outline: none;
+    }
+    .t-input::placeholder { color: rgba(0,0,0,0.35); }
+
+    .c-input {
+      flex: 1 1 auto; min-height: 0;        /* 남은 공간을 전부 차지 */
+      margin: 10px 16px 0; resize: none;
+      background: rgba(255,255,255,0.78);
+      border: 2px solid rgba(0,0,0,0.12);
+      border-radius: 14px; padding: 16px;
+      font-size: 19px; font-weight: 700; line-height: 1.7; color: #1f2937;
+      outline: none;
+      overflow-y: auto;   /* 내용이 칸보다 길면 칸 안에서 스크롤 */
+    }
+    .c-input::placeholder { color: #9ca3af; font-weight: 600; }
+
+    /* ── 하단: 작은 아이콘 한 줄 (추가 / 삭제 / 설정) ── */
+    .p-actions { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 14px 12px; }
+    .icon-btn {
+      width: 42px; height: 42px; flex: 0 0 auto;
+      border: none; border-radius: 12px;
+      font-size: 20px; line-height: 1; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.6); color: #111827;
+    }
+    .icon-btn:hover { background: rgba(255,255,255,0.92); }
+    .icon-btn.del:hover { background: #FCA5A5; }
+    .icon-btn.gear.on { background: rgba(255,255,255,0.95); box-shadow: inset 0 0 0 2px rgba(0,0,0,0.18); }
+
+    /* ── "컴퓨터 켜면 자동 실행" 설정 영역 (⚙️ 누를 때만 보임) ── */
+    .autorun {
+      display: none;                       /* 기본 숨김 */
+      margin: 0 14px 12px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.85);
+      border: 2px solid rgba(0,0,0,0.12);
+      border-radius: 14px;
+    }
+    .autorun.open { display: block; }
+    .autorun .ar-top {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .autorun .ar-title {
+      font-size: 19px; font-weight: 900; color: #1f2937; line-height: 1.3;
+    }
+    .autorun .ar-desc {
+      margin-top: 8px; font-size: 15px; font-weight: 700; color: #4b5563; line-height: 1.5;
+    }
+    /* 큰 토글 스위치 */
+    .switch { position: relative; flex: 0 0 auto; width: 72px; height: 40px; cursor: pointer; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track {
+      position: absolute; inset: 0; border-radius: 999px;
+      background: #9ca3af; transition: background .15s ease;
+    }
+    .switch .thumb {
+      position: absolute; top: 4px; left: 4px; width: 32px; height: 32px;
+      border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      transition: transform .15s ease;
+    }
+    .switch input:checked + .track { background: #16a34a; }
+    .switch input:checked + .track + .thumb { transform: translateX(32px); }
+
+    /* ── 세로 탭 묶음 (오른쪽 끝, 포스트잇) ── */
+    .strip {
+      display: flex; flex-direction: column; gap: 11px; align-items: flex-end;
+      max-height: calc(100vh - 56px); overflow-y: auto; overflow-x: hidden;
+    }
+    .strip::-webkit-scrollbar { width: 0; }
+
+    .tab {
+      width: 82px; min-height: 150px; cursor: pointer;   /* 더 넓고 길게 */
+      border-radius: 18px 0 0 18px;             /* 왼쪽만 둥글게(오른쪽은 화면 끝) */
+      box-shadow: -5px 5px 12px rgba(0,0,0,0.22);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .tab:hover  { transform: translateX(-4px); }
+    .tab.active { transform: translateX(-5px); box-shadow: -7px 6px 16px rgba(0,0,0,0.32); }
+    .tab .label {
+      writing-mode: vertical-rl; text-orientation: upright;
+      white-space: nowrap;                                       /* ★ 한 줄(한 열)로만 — 옆으로 꺾여 순서 뒤바뀜 방지 */
+      letter-spacing: 3px; font-size: 23px; font-weight: 900;    /* 제목 진하게 */
+      padding: 12px 0;        /* max-height/overflow 제거 → 제목 길면 탭이 아래로 더 길어짐 */
+    }
+    /* 메모 추가(＋) 탭 */
+    .tab.addtab { min-height: 64px; background: rgba(255,255,255,0.55); border: 2px dashed rgba(0,0,0,0.28); box-shadow: -3px 3px 8px rgba(0,0,0,0.15); }
+    .tab.addtab .label { color: #374151; font-size: 30px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- 메모판 (펼침 시 보임) -->
+    <div class="panel" id="panel">
+      <div class="p-head">
+        <input id="titleInput" class="t-input" placeholder="제목" maxlength="24" />
+      </div>
+      <textarea id="contentInput" class="c-input" placeholder="여기에 메모 내용을 적으세요"></textarea>
+
+      <!-- 하단 작은 아이콘 한 줄 -->
+      <div class="p-actions">
+        <button class="icon-btn add"  id="addBtn"  title="메모 추가">＋</button>
+        <button class="icon-btn del"  id="delBtn"  title="메모 삭제">🗑</button>
+        <button class="icon-btn gear" id="gearBtn" title="설정">⚙️</button>
+      </div>
+
+      <!-- 컴퓨터 켜면 자동 실행 설정 (⚙️ 누를 때만 펼쳐짐) -->
+      <div class="autorun" id="autorunBox">
+        <div class="ar-top">
+          <div class="ar-title">컴퓨터 켜면 자동 실행</div>
+          <label class="switch">
+            <input type="checkbox" id="autoRunChk" />
+            <span class="track"></span>
+            <span class="thumb"></span>
+          </label>
+        </div>
+        <div class="ar-desc">켜 두면 컴퓨터를 켤 때마다 메모쏙이 자동으로 실행됩니다.</div>
+      </div>
+    </div>
+
+    <!-- 세로 탭 묶음 -->
+    <div class="strip" id="strip"></div>
+  </div>
+
+  <script>
+    // 파스텔 색 + 진한 글자색
+    const PALETTE = [
+      { bg: '#FFE7A0', fg: '#7A5B00' }, // 노랑
+      { bg: '#FBC9DD', fg: '#9B2C5A' }, // 분홍
+      { bg: '#B8E4F5', fg: '#0E5E80' }, // 하늘
+      { bg: '#C5EAC0', fg: '#256A2E' }, // 연두
+    ];
+    const colorOf = (m) => PALETTE[(m.colorIndex ?? 0) % PALETTE.length];
+    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const uid = () => 'm' + Math.random().toString(36).slice(2, 9);
+
+    let memos = [];
+    let active = -1;   // 펼쳐진 메모 index (-1 = 모두 접힘)
+
+    const stripEl = document.getElementById('strip');
+    const panelEl = document.getElementById('panel');
+    const titleInput = document.getElementById('titleInput');
+    const contentInput = document.getElementById('contentInput');
+
+    let saveTimer = null;
+    function saveNow()      { if (window.widget) window.widget.saveMemos(memos); }
+    function saveDebounced(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 300); }
+
+    function setExpanded(e) {
+      document.body.classList.toggle('expanded', e);
+      if (window.widget) window.widget.setExpanded(e);
+    }
+
+    // 세로 탭만 다시 그림 (입력 중에는 panel은 안 건드림 → 커서 유지)
+    function renderStrip() {
+      stripEl.innerHTML = '';
+      memos.forEach((m, i) => {
+        const c = colorOf(m);
+        const el = document.createElement('div');
+        el.className = 'tab' + (i === active ? ' active' : '');
+        el.style.background = c.bg;
+        el.innerHTML = `<span class="label" style="color:${c.fg}">${escapeHtml(m.title || '메모')}</span>`;
+        el.addEventListener('click', () => toggle(i));
+        stripEl.appendChild(el);
+      });
+      // ＋ 추가 탭
+      const add = document.createElement('div');
+      add.className = 'tab addtab';
+      add.innerHTML = '<span class="label">＋</span>';
+      add.addEventListener('click', addMemo);
+      stripEl.appendChild(add);
+    }
+
+    // 펼친 메모판 값 채우기 (메모 전환 시에만 호출)
+    function fillPanel() {
+      if (active < 0 || !memos[active]) return;
+      const m = memos[active], c = colorOf(m);
+      panelEl.style.setProperty('--bg', c.bg);
+      panelEl.style.setProperty('--fg', c.fg);
+      titleInput.value = m.title || '';
+      contentInput.value = m.content || '';
+      contentInput.scrollTop = 0;
+    }
+
+    function toggle(i) {
+      if (active === i) { active = -1; setExpanded(false); }
+      else              { active = i;  setExpanded(true); fillPanel(); }
+      renderStrip();
+    }
+
+    function addMemo() {
+      const m = { id: uid(), title: '새 메모', content: '', colorIndex: memos.length % PALETTE.length };
+      memos.push(m);
+      active = memos.length - 1;
+      saveNow();
+      setExpanded(true);
+      fillPanel();
+      renderStrip();
+      setTimeout(() => titleInput.select(), 60);
+    }
+
+    function delMemo() {
+      if (active < 0 || !memos[active]) return;
+      const m = memos[active];
+      if (!confirm(`"${m.title || '이 메모'}" 정말 삭제할까요?\n(복구할 수 없습니다)`)) return;
+      memos.splice(active, 1);
+      active = -1;
+      saveNow();
+      setExpanded(false);
+      renderStrip();
+    }
+
+    // 입력 → 모델 반영 + 탭 라벨 즉시 갱신 + 저장(디바운스)
+    titleInput.addEventListener('input', () => {
+      if (active < 0) return;
+      memos[active].title = titleInput.value;
+      const lab = stripEl.children[active]?.querySelector('.label');
+      if (lab) lab.textContent = titleInput.value || '메모';
+      saveDebounced();
+    });
+    contentInput.addEventListener('input', () => {
+      if (active < 0) return;
+      memos[active].content = contentInput.value;
+      saveDebounced();
+    });
+    // 포커스 벗어나면 즉시 저장
+    titleInput.addEventListener('blur', saveNow);
+    contentInput.addEventListener('blur', saveNow);
+
+    document.getElementById('addBtn').addEventListener('click', addMemo);
+    document.getElementById('delBtn').addEventListener('click', delMemo);
+
+    // ⚙️ 설정 버튼: 자동실행 영역을 보였다/숨겼다
+    const gearBtn = document.getElementById('gearBtn');
+    const autorunBox = document.getElementById('autorunBox');
+    gearBtn.addEventListener('click', () => {
+      const open = autorunBox.classList.toggle('open');
+      gearBtn.classList.toggle('on', open);
+    });
+
+    // 컴퓨터 켜면 자동 실행 토글
+    const autoRunChk = document.getElementById('autoRunChk');
+    (async () => {
+      try { autoRunChk.checked = !!(window.widget && await window.widget.getAutoLaunch()); }
+      catch { autoRunChk.checked = false; }
+    })();
+    autoRunChk.addEventListener('change', async () => {
+      try {
+        if (window.widget) await window.widget.setAutoLaunch(autoRunChk.checked);
+      } catch {
+        // 실패 시 화면 표시를 실제 상태로 되돌림
+        try { autoRunChk.checked = !!(window.widget && await window.widget.getAutoLaunch()); } catch {}
+      }
+    });
+
+    // 시작: 저장된 메모 불러오기
+    (async () => {
+      try { memos = (window.widget && await window.widget.loadMemos()) || []; }
+      catch { memos = []; }
+      if (!Array.isArray(memos)) memos = [];
+      renderStrip();
+    })();
+  </script>
+</body>
+</html>

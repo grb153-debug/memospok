@@ -1,0 +1,10 @@
+# 의존성 (npm install 로 다시 받음 — 깃에 올리지 않음)
+node_modules/
+
+# 빌드 결과물 (electron-builder 출력)
+dist/
+
+# 로그/임시
+*.log
+.DS_Store
+Thumbs.db
