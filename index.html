@@ -2,13 +2,22 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self'" />
   <title>메모쏙</title>
   <style>
+    /* 주아체(BM Jua) — 폰트 파일을 앱에 포함(인터넷 없이도 표시됨) */
+    @font-face {
+      font-family: 'Jua';
+      src: url('fonts/Jua-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; background: transparent; }
     body {
-      font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;
+      font-family: 'Jua', 'Malgun Gothic', 'Segoe UI', sans-serif;
       user-select: none; overflow: hidden;
     }
 
@@ -100,30 +109,37 @@
     .switch input:checked + .track + .thumb { transform: translateX(32px); }
 
     /* ── 세로 탭 묶음 (오른쪽 끝, 포스트잇) ── */
+    /* [수정3 빼꼼] 평소엔 오른쪽 끝에 얇게 숨고, 마우스 올리면 쏙 나옴(슬라이드) */
     .strip {
-      display: flex; flex-direction: column; gap: 11px; align-items: flex-end;
+      display: flex; flex-direction: column; gap: 4px; align-items: flex-end;   /* [수정4] 촘촘하게 */
       max-height: calc(100vh - 56px); overflow-y: auto; overflow-x: hidden;
+      transition: transform .22s ease;
     }
     .strip::-webkit-scrollbar { width: 0; }
+    /* 접힘 + 마우스 벗어남 → 탭 묶음을 오른쪽으로 밀어 얇은 띠만 보이게 */
+    body.peek:not(.expanded) .strip { transform: translateX(44px); }
 
     .tab {
-      width: 82px; min-height: 150px; cursor: pointer;   /* 더 넓고 길게 */
-      border-radius: 18px 0 0 18px;             /* 왼쪽만 둥글게(오른쪽은 화면 끝) */
+      width: 56px; flex: 0 0 auto;              /* [수정2] 제목이 길어도 폭은 항상 일정(얇게) */
+      min-height: 96px; cursor: pointer;
+      border-radius: 16px 0 0 16px;             /* 왼쪽만 둥글게(오른쪽은 화면 끝) */
       box-shadow: -5px 5px 12px rgba(0,0,0,0.22);
       display: flex; align-items: center; justify-content: center;
-      transition: transform .12s ease, box-shadow .12s ease;
+      transition: box-shadow .12s ease;
+      overflow: hidden;                         /* 제목 길어도 탭 밖으로 안 삐져나옴 */
     }
-    .tab:hover  { transform: translateX(-4px); }
-    .tab.active { transform: translateX(-5px); box-shadow: -7px 6px 16px rgba(0,0,0,0.32); }
+    .tab.active { box-shadow: -7px 6px 16px rgba(0,0,0,0.32); }
     .tab .label {
       writing-mode: vertical-rl; text-orientation: upright;
-      white-space: nowrap;                                       /* ★ 한 줄(한 열)로만 — 옆으로 꺾여 순서 뒤바뀜 방지 */
-      letter-spacing: 3px; font-size: 23px; font-weight: 900;    /* 제목 진하게 */
-      padding: 12px 0;        /* max-height/overflow 제거 → 제목 길면 탭이 아래로 더 길어짐 */
+      white-space: nowrap;                      /* [수정2] 세로 한 줄(한 열)로만 */
+      max-height: calc(100vh - 150px);          /* 너무 길면 잘림 */
+      overflow: hidden;
+      letter-spacing: 2px; font-size: 21px; font-weight: 800;   /* 크고 진하게 유지 */
+      padding: 12px 0;
     }
     /* 메모 추가(＋) 탭 */
-    .tab.addtab { min-height: 64px; background: rgba(255,255,255,0.55); border: 2px dashed rgba(0,0,0,0.28); box-shadow: -3px 3px 8px rgba(0,0,0,0.15); }
-    .tab.addtab .label { color: #374151; font-size: 30px; }
+    .tab.addtab { min-height: 54px; background: rgba(255,255,255,0.55); border: 2px dashed rgba(0,0,0,0.28); box-shadow: -3px 3px 8px rgba(0,0,0,0.15); }
+    .tab.addtab .label { color: #374151; font-size: 28px; }
 
     /* ── 자동 업데이트 알림 (오른쪽 아래 작게) ── */
     .update-toast {
@@ -217,10 +233,24 @@
     function saveNow()      { if (window.widget) window.widget.saveMemos(memos); }
     function saveDebounced(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 300); }
 
+    // 탭 라벨: 너무 길면 … 으로 자르고, 길수록 글자를 살짝 작게 (탭 폭은 항상 일정)
+    function tabLabelText(t) { const s = (t || '메모'); return s.length > 13 ? s.slice(0, 12) + '…' : s; }
+    function tabFontSize(t)  { const n = (t || '메모').length; return n <= 5 ? '21px' : n <= 9 ? '18px' : '16px'; }
+
     function setExpanded(e) {
       document.body.classList.toggle('expanded', e);
+      if (e) document.body.classList.remove('peek');   // 펼치면 탭 숨김 해제
       if (window.widget) window.widget.setExpanded(e);
     }
+
+    // [수정3 빼꼼] 마우스를 올리면 탭이 쏙 나오고, 벗어나면 다시 얇게 숨음.
+    //   (메모판을 펼친 상태에서는 동작하지 않음 — 작업 중 사라지면 안 되니까)
+    function setPeek(hide) {
+      if (active >= 0) return;            // 펼쳐져 있으면 그대로 둠
+      document.body.classList.toggle('peek', hide);
+    }
+    document.body.addEventListener('mouseenter', () => setPeek(false));
+    document.body.addEventListener('mouseleave', () => setPeek(true));
 
     // 세로 탭만 다시 그림 (입력 중에는 panel은 안 건드림 → 커서 유지)
     function renderStrip() {
@@ -230,7 +260,7 @@
         const el = document.createElement('div');
         el.className = 'tab' + (i === active ? ' active' : '');
         el.style.background = c.bg;
-        el.innerHTML = `<span class="label" style="color:${c.fg}">${escapeHtml(m.title || '메모')}</span>`;
+        el.innerHTML = `<span class="label" style="color:${c.fg};font-size:${tabFontSize(m.title)}">${escapeHtml(tabLabelText(m.title))}</span>`;
         el.addEventListener('click', () => toggle(i));
         stripEl.appendChild(el);
       });
@@ -286,7 +316,7 @@
       if (active < 0) return;
       memos[active].title = titleInput.value;
       const lab = stripEl.children[active]?.querySelector('.label');
-      if (lab) lab.textContent = titleInput.value || '메모';
+      if (lab) { lab.textContent = tabLabelText(titleInput.value); lab.style.fontSize = tabFontSize(titleInput.value); }
       saveDebounced();
     });
     contentInput.addEventListener('input', () => {
@@ -366,7 +396,8 @@
       });
     }
 
-    // 시작: 저장된 메모 불러오기
+    // 시작: 저장된 메모 불러오기 + 평소엔 얇게 숨긴 상태로 시작
+    document.body.classList.add('peek');
     (async () => {
       try { memos = (window.widget && await window.widget.loadMemos()) || []; }
       catch { memos = []; }

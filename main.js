@@ -11,7 +11,7 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 
-const COLLAPSED_W = 96;    // 접힘: 세로 탭 폭(크게)
+const COLLAPSED_W = 64;    // 접힘: 얇은 세로 탭 폭(빼꼼 숨김 포함)
 const EXPANDED_W  = 432;   // 펼침: 메모판 + 탭 폭
 
 let win;

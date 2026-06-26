@@ -1,6 +1,6 @@
 {
   "name": "memospok",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "메모쏙 - 데스크톱 메모 위젯 (화면 오른쪽 가장자리 포스트잇)",
   "main": "main.js",
   "author": "memospok",
@@ -22,7 +22,8 @@
       "main.js",
       "preload.js",
       "index.html",
-      "package.json"
+      "package.json",
+      "fonts/**/*"
     ],
     "win": {
       "target": "nsis"
